@@ -1,0 +1,3 @@
+pip install imageio
+pip install pypng
+pip install opencv-python
