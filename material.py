@@ -66,8 +66,10 @@ class Material:
         if(scene.sampling == Sampling.IMPORTANCE_SAMPLING):
             # brdf, pdf
             result = self.importance_sample(ray, hit_record, scattered_ray)
-            # brdf / pdf
-            return result[0] / result[1]
+            reflectance = 0.0
+            if(result[1] > 0.0):
+                reflectance = result[0] / result[1]
+            return reflectance
         else:
             return self.importance_resample(scene, path, ray, hit_record, scattered_ray)
 
