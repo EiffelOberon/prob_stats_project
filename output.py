@@ -44,7 +44,7 @@ def path_trace_row(frame, progress, start_y, step, width, height, scene, paths, 
         progress[y] = 1
         print("Progress: %.2f%% [Sample: %i/%i]" % ((np.clip((np.sum(progress) / height), 0.0, 1.0) * 100), (sample_idx + 1), samples))
 
-def threaded_path_trace(frame, width, height, scene, samples, threads):
+def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
     step = threads
     threads = [None] * step
     paths = [None] * width * height
@@ -81,11 +81,18 @@ def threaded_path_trace(frame, width, height, scene, samples, threads):
                 rgb_row = rgb_row + (color[0], color[1], color[2])
             frame.img[y] = rgb_row
         # save image
-        file = "{}_{}_spp.png"
+        folder = "./results/" + sky + "_{}/"
+        file = "./results/" + sky + "_{}/{}_{}_spp.png"
         if(scene.sampling == Sampling.IMPORTANCE_SAMPLING):
-            file = file.format("is", (sample_idx + 1))
+            folder = folder.format("is")
+            file = file.format("is", "is", (sample_idx + 1))
         else:
-            file = file.format("sir", (sample_idx + 1))
+            folder = folder.format("sir")
+            file = file.format("sir", "sir", (sample_idx + 1))
+
+        isExist = os.path.exists(folder)
+        if isExist == False:
+            os.makedirs(folder)
         with open(file, 'wb') as f:
             w = png.Writer(width, height, greyscale=False, gamma=1.0)
             w.write(f, frame.img)
@@ -103,12 +110,13 @@ def threaded_path_trace(frame, width, height, scene, samples, threads):
     plt.show(block=True)
     print("Finished rendering - saving image")
 
-def render(threads, samples, sample_type, max_bounce):
+def render(threads, sky, samples, sample_type, max_bounce):
     # read sky
     print("Loading sky image")
     # required for processing HDR images properly
     iio.plugins.freeimage.download()
-    sky_image = iio.imread('./snow_field_2_puresky_1k.hdr')
+    sky_file_name = "./"+ sky +".hdr"
+    sky_image = iio.imread(sky_file_name)
     
     # the HDRI loaded in macOS is [0, 255] not [0.0, 1.0], so
     # we normalize it for just macOS
@@ -129,7 +137,7 @@ def render(threads, samples, sample_type, max_bounce):
     # initialize image
     frame = Frame(width, height)
     # path trace
-    threaded_path_trace(frame, width, height, scene, samples, threads)
+    threaded_path_trace(frame, sky, width, height, scene, samples, threads)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
@@ -161,5 +169,11 @@ if __name__ == '__main__':
         default=2,
         help="Max number of bounce. (Default: 2)"
     )
+    parser.add_argument(
+        "--sky", 
+        type=str, 
+        required=True,
+        help="Environment map file name, i.e. snow_field_2_puresky_1k"
+    )
     args = parser.parse_args()
-    render(args.thread_count, args.sample_count, args.sample_type, args.max_bounce)
+    render(args.thread_count, args.sky, args.sample_count, args.sample_type, args.max_bounce)

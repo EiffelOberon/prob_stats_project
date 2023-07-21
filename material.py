@@ -87,9 +87,6 @@ class Diffuse(Material):
         offset = path.y * scene.width + path.x
         offset = offset * int(RandomNumber.RANDOM_COUNT) * scene.max_bounce
         offset = offset + int(RandomNumber.RANDOM_COUNT) * path.bounce
-        if(path.x == 250 and path.y == 290):
-            print(offset)
-            print(scene.rng[offset+int(RandomNumber.RANDOM_BRDF_U)])
         # random numbers
         r = np.array([scene.rng[offset + int(RandomNumber.RANDOM_BRDF_U)], scene.rng[offset + int(RandomNumber.RANDOM_BRDF_V)]])
         # cosine hemisphere sampling
