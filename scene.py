@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 from camera import *
 from color import *
@@ -28,6 +29,14 @@ class Scene:
         self.world = Hittable_List(object_list)
         # HDRI environment texture we load at the start, this supplies radiance for lighting objects in the scene
         self.environment = sky_image
+        self.rng = []
+    
+    def init_random(self, seed):
+        self.rng = []
+        random.seed(seed)
+        for i in range(0, self.width*self.height*(self.max_bounce*int(RandomNumber.RANDOM_COUNT))):
+            self.rng.append(random.random())
+
     
     def evaluate_environment(self, direction):
         # normalize the direction of the ray

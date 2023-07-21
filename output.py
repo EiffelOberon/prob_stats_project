@@ -56,6 +56,8 @@ def threaded_path_trace(frame, width, height, scene, samples, threads):
     
     for sample_idx in range(0, samples, 1):
         progress = [0] * height
+        scene.init_random(sample_idx)
+        
         # start threads
         for i in range(step):
             threads[i] = threading.Thread(target=path_trace_row, args=(frame, progress, i, step, width, height, scene, paths, sample_idx, samples))
@@ -104,12 +106,14 @@ def threaded_path_trace(frame, width, height, scene, samples, threads):
 def render(threads, samples, sample_type, max_bounce):
     # read sky
     print("Loading sky image")
-    #iio.plugins.freeimage.download()
+    # required for processing HDR images properly
+    iio.plugins.freeimage.download()
     sky_image = iio.imread('./snow_field_2_puresky_1k.hdr')
+    
     # the HDRI loaded in macOS is [0, 255] not [0.0, 1.0], so
     # we normalize it for just macOS
-    if platform == "darwin":
-        sky_image = sky_image * 1.0 / 255.0
+    # if platform == "darwin":
+       # sky_image = sky_image * 1.0 / 255.0
     print("Image Loaded. Image Detail (Height, Width, Channel): ", sky_image.shape)
 
     print("Begin rendering")

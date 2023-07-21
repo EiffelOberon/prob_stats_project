@@ -31,7 +31,7 @@ class TangentBasis:
 class Material:
 
     # abstract method inherited by subclasses
-    def importance_sample(self, ray, hit_record, scattered_ray):
+    def importance_sample(self, scene, path, ray, hit_record, scattered_ray):
         pass
 
     def importance_resample(self, scene, path, ray, hit_record, scattered_ray):
@@ -50,8 +50,13 @@ class Material:
             if(result[1] > 0.0):
                 g_over_f = g / result[1]
             total_weight = total_weight + g_over_f
-            # random number
-            if( random.random() * total_weight < g_over_f):
+            # offset
+            offset = path.y * scene.width + path.x
+            offset = offset * int(RandomNumber.RANDOM_COUNT) * scene.max_bounce
+            offset = offset + int(RandomNumber.RANDOM_COUNT) * path.bounce
+            # random numbers
+            r = scene.rng[offset + int(RandomNumber.RANDOM_RIS_1) + i]
+            if( r * total_weight < g_over_f):
                  index = i
                  target_pdf = g
         recip = ( target_pdf * count )
@@ -65,7 +70,7 @@ class Material:
     def sample(self, scene, path, ray, hit_record, scattered_ray):
         if(scene.sampling == Sampling.IMPORTANCE_SAMPLING):
             # brdf, pdf
-            result = self.importance_sample(ray, hit_record, scattered_ray)
+            result = self.importance_sample(scene, path, ray, hit_record, scattered_ray)
             reflectance = 0.0
             if(result[1] > 0.0):
                 reflectance = result[0] / result[1]
@@ -77,9 +82,16 @@ class Diffuse(Material):
     def __init__(self, albedo):
         self.albedo = albedo
 
-    def importance_sample(self, ray, hit_record, scattered_ray):
+    def importance_sample(self, scene, path, ray, hit_record, scattered_ray):
+        # offset
+        offset = path.y * scene.width + path.x
+        offset = offset * int(RandomNumber.RANDOM_COUNT) * scene.max_bounce
+        offset = offset + int(RandomNumber.RANDOM_COUNT) * path.bounce
+        if(path.x == 250 and path.y == 290):
+            print(offset)
+            print(scene.rng[offset+int(RandomNumber.RANDOM_BRDF_U)])
         # random numbers
-        r = np.array([random.random(), random.random()])
+        r = np.array([scene.rng[offset + int(RandomNumber.RANDOM_BRDF_U)], scene.rng[offset + int(RandomNumber.RANDOM_BRDF_V)]])
         # cosine hemisphere sampling
         cos_theta = np.sqrt(r[0])
         sin_theta = np.sqrt(1.0 - r[0]) 
@@ -107,11 +119,15 @@ class Metal(Material):
         else: 
             self.roughness = 1.0
 
-    def importance_sample(self, ray, hit_record, scattered_ray):
+    def importance_sample(self, scene, path, ray, hit_record, scattered_ray):
+        # offset
+        offset = path.y * scene.width + path.x
+        offset = offset * int(RandomNumber.RANDOM_COUNT) * scene.max_bounce
+        offset = offset + int(RandomNumber.RANDOM_COUNT) * path.bounce
+        # random numbers
+        r = np.array([scene.rng[offset + int(RandomNumber.RANDOM_BRDF_U)], scene.rng[offset + int(RandomNumber.RANDOM_BRDF_V)]])
         # clamp roughness squared for numerical precision of the distribution function
         alpha2 = max(self.roughness * self.roughness, 0.00001)
-        # generate random numbers
-        r = np.array([random.random(), random.random()])
         # sample microfacet normal (also known as half vector)
         cos_theta = np.sqrt(max(0.0, ( 1.0 - r[0] ) / ( 1.0 + ( alpha2 - 1.0 ) * r[0] )))
         sin_theta = np.sqrt(max(0.0, 1.0 - cos_theta * cos_theta))
