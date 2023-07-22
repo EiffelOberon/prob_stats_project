@@ -83,12 +83,8 @@ class Diffuse(Material):
         self.albedo = albedo
 
     def importance_sample(self, scene, path, ray, hit_record, scattered_ray):
-        # offset
-        offset = path.y * scene.width + path.x
-        offset = offset * int(RandomNumber.RANDOM_COUNT) * scene.max_bounce
-        offset = offset + int(RandomNumber.RANDOM_COUNT) * path.bounce
         # random numbers
-        r = np.array([scene.rng[offset + int(RandomNumber.RANDOM_BRDF_U)], scene.rng[offset + int(RandomNumber.RANDOM_BRDF_V)]])
+        r = scene.get_brdf_r(path.x, path.y, path.bounce)
         # cosine hemisphere sampling
         cos_theta = np.sqrt(r[0])
         sin_theta = np.sqrt(1.0 - r[0]) 
@@ -117,12 +113,8 @@ class Metal(Material):
             self.roughness = 1.0
 
     def importance_sample(self, scene, path, ray, hit_record, scattered_ray):
-        # offset
-        offset = path.y * scene.width + path.x
-        offset = offset * int(RandomNumber.RANDOM_COUNT) * scene.max_bounce
-        offset = offset + int(RandomNumber.RANDOM_COUNT) * path.bounce
         # random numbers
-        r = np.array([scene.rng[offset + int(RandomNumber.RANDOM_BRDF_U)], scene.rng[offset + int(RandomNumber.RANDOM_BRDF_V)]])
+        r = scene.get_brdf_r(path.x, path.y, path.bounce)
         # clamp roughness squared for numerical precision of the distribution function
         alpha2 = max(self.roughness * self.roughness, 0.00001)
         # sample microfacet normal (also known as half vector)

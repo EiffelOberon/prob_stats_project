@@ -12,14 +12,14 @@ from util import *
 def trace(scene, ray, path):
     hit_record = HitRecord()
     if scene.world.hit(ray, 0.0001, 10000000.0, hit_record) > 0:
-        # initialize ray for our scattering from current bounce
-        scattered_ray = Ray(origin=np.array([0.0, 0.0, 0.0]), direction=np.array([0.0, 0.0, 0.0]))
-        # sample according to material's BSDF
-        reflectance = hit_record.material.sample(scene, path, ray, hit_record, scattered_ray)
-        # we limit to 1 bounce
+        # increment bounce
+        path.bounce = path.bounce + 1
+        # limit bounce
         if path.bounce < scene.max_bounce:
-            # increment bounce
-            path.bounce = path.bounce + 1
+            # initialize ray for our scattering from current bounce
+            scattered_ray = Ray(origin=np.array([0.0, 0.0, 0.0]), direction=np.array([0.0, 0.0, 0.0]))
+            # sample according to material's BSDF
+            reflectance = hit_record.material.sample(scene, path, ray, hit_record, scattered_ray)
             # trace next ray
             return trace(scene, scattered_ray, path) * reflectance
         else:
