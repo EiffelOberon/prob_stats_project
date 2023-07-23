@@ -42,7 +42,7 @@ class Material:
         index = 0
         target_pdf = 0.0
         for i in range(0, count):
-            result = self.importance_sample(ray, hit_record, scattered_ray)
+            result = self.importance_sample(scene, path, ray, hit_record, scattered_ray)
             samples.append(result[0])
             # multiply reflectance by environment radiance
             g = luminance(np.multiply(scene.evaluate_environment(scattered_ray.direction), samples[i]))
