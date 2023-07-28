@@ -28,6 +28,7 @@ def image_comparison(lighting_file, image_count):
     folder_path = "./results/" + lighting_file
     xaxis = np.arange(1, image_count+1)
     yaxes = []
+    current_idx = 0
     for i in algorithm:
         compare_folder_path = folder_path
         if i == "IS":
@@ -40,7 +41,7 @@ def image_comparison(lighting_file, image_count):
             return
         mses = np.zeros(image_count)
         for image_idx in range(0, image_count):
-            print("Format: %d/%d Image: %d/%d" % (i, len(algorithm), image_idx, image_count))
+            print("Format: %d/%d Image: %d/%d" % (current_idx, len(algorithm), image_idx, image_count))
             compare_image_path = compare_folder_path
             if i == "IS":
                 compare_image_path = compare_image_path + "is_" + str(image_idx+1) + "_spp.png"
@@ -50,6 +51,7 @@ def image_comparison(lighting_file, image_count):
             mse = compare_images(reference_image, result_image)
             mses[image_idx]=mse
         yaxes.append(mses)
+        current_idx = current_idx + 1
     fig, ax = plt.subplots()
     ax.plot(xaxis, yaxes[0])
     ax.plot(xaxis, yaxes[1])
