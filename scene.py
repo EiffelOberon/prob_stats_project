@@ -29,21 +29,6 @@ class Scene:
         self.world = Hittable_List(object_list)
         # HDRI environment texture we load at the start, this supplies radiance for lighting objects in the scene
         self.environment = sky_image
-        self.rng = []
-    
-    def init_random(self, seed):
-        self.rng = []
-        random.seed(seed)
-        for i in range(0, self.width*self.height*(self.max_bounce*int(RandomNumber.RANDOM_COUNT))):
-            self.rng.append(random.random())
-
-    def get_brdf_r(self, x, y, bounce):
-        offset = y * self.width + x
-        offset = offset * int(RandomNumber.RANDOM_COUNT) * self.max_bounce
-        offset = offset + int(RandomNumber.RANDOM_COUNT) * bounce
-        if(offset >= len(self.rng)):
-            print("Exceeded rng array length (x:%d) (y:%d) (offset:%d) (length:%d) (bounce:%d)" % (x, y, offset, len(self.rng), bounce))
-        return np.array([self.rng[offset + int(RandomNumber.RANDOM_BRDF_U)], self.rng[offset + int(RandomNumber.RANDOM_BRDF_V)]])
     
     def evaluate_environment(self, direction):
         # normalize the direction of the ray

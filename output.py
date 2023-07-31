@@ -19,6 +19,7 @@ from color import *
 from frame import Frame
 from path import Path
 from ray import Ray
+from sampler import *
 from sphere import *
 from trace import *
 
@@ -31,12 +32,14 @@ def path_trace_row(frame, progress, start_y, step, width, height, scene, paths, 
             path_index = y * width + x
             paths[path_index] = Path(x, y, path_index)
             paths[path_index].bounce = 0
+            seed = (y << 16) + x
+            sampler = Sampler(width, height, seed)
             # calculate screen [0,1] coordinate
-            u = float(x + random.random())/float(width)
-            v = float((height - y) + random.random())/float(height)
+            u = float(x + sampler.next())/float(width)
+            v = float((height - y) + sampler.next())/float(height)
             cam_ray = scene.camera.get_ray(u, v)
             # start tracing rays
-            color = color + trace(scene, cam_ray, paths[path_index])
+            color = color + trace(scene, sampler, cam_ray, paths[path_index])
             frame.accumulation[y * width + x] = frame.accumulation[y * width + x] + color
             color = linear_to_srgb(frame.accumulation[y * width + x] / (sample_idx + 1))
             # set image
@@ -55,7 +58,6 @@ def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
     fig, ax = plt.subplots()
     for sample_idx in range(0, samples, 1):
         progress = [0] * height
-        scene.init_random(sample_idx)
         # start threads
         for i in range(step):
             threads[i] = threading.Thread(target=path_trace_row, args=(frame, progress, i, step, width, height, scene, paths, sample_idx, samples))
@@ -118,7 +120,6 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
     fig, ax = plt.subplots()
     sample_idx = 0
     progress = [0] * height
-    scene.init_random(sample_idx)
     # start threads
     for i in range(step):
         threads[i] = threading.Thread(target=path_trace_row, args=(frame, progress, i, step, width, height, scene, paths, sample_idx, samples))
