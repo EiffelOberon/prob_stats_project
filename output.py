@@ -53,17 +53,14 @@ def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
     # figure for displaying image during render
     plt.ion()
     fig, ax = plt.subplots()
-    
     for sample_idx in range(0, samples, 1):
         progress = [0] * height
         scene.init_random(sample_idx)
-        
         # start threads
         for i in range(step):
             threads[i] = threading.Thread(target=path_trace_row, args=(frame, progress, i, step, width, height, scene, paths, sample_idx, samples))
             threads[i].start()
         # display image interactively
-        
         while(np.sum(progress) < height):
             image_display = ax.imshow(frame.display_img, extent=[0, width, 0, height])
             fig.canvas.flush_events()
@@ -110,7 +107,70 @@ def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
     plt.show(block=True)
     print("Finished rendering - saving image")
 
-def render(threads, sky, samples, sample_type, max_bounce):
+def threaded_mlt(frame, sky, width, height, scene, samples, threads):
+    step = threads
+    threads = [None] * step
+    paths = [None] * width * height
+    # record start time
+    start = time.perf_counter()
+    # figure for displaying image during render
+    plt.ion()
+    fig, ax = plt.subplots()
+    sample_idx = 0
+    progress = [0] * height
+    scene.init_random(sample_idx)
+    # start threads
+    for i in range(step):
+        threads[i] = threading.Thread(target=path_trace_row, args=(frame, progress, i, step, width, height, scene, paths, sample_idx, samples))
+        threads[i].start()
+    # display image interactively
+    while(np.sum(progress) < height):
+        image_display = ax.imshow(frame.display_img, extent=[0, width, 0, height])
+        fig.canvas.flush_events()
+        plt.show()
+        time.sleep(0.5)
+    # wait for all threads to finish
+    for i in range(step):
+        threads[i].join()
+    # copy results
+    for y in range(0, height):
+        rgb_row = ()
+        for x in range(width):
+            color = frame.accumulation[y * width + x] / (sample_idx + 1)
+            color = linear_to_srgb(color)
+            rgb_row = rgb_row + (color[0], color[1], color[2])
+        frame.img[y] = rgb_row
+    # save image
+    folder = "./results/" + sky + "_{}/"
+    file = "./results/" + sky + "_{}/{}_{}_spp.png"
+    if(scene.sampling == Sampling.IMPORTANCE_SAMPLING):
+        folder = folder.format("mlt_is")
+        file = file.format("mlt_is", "is", (sample_idx + 1))
+    else:
+        folder = folder.format("mlt_sir")
+        file = file.format("mlt_sir", "sir", (sample_idx + 1))
+
+    isExist = os.path.exists(folder)
+    if isExist == False:
+        os.makedirs(folder)
+    with open(file, 'wb') as f:
+        w = png.Writer(width, height, greyscale=False, gamma=1.0)
+        w.write(f, frame.img)
+        print("Image saved")
+    
+    # record end time
+    end = time.perf_counter()
+    duration = timedelta(seconds=end-start)
+    print("Render completed in: ", duration)
+
+    # display finished image
+    image_display = ax.imshow(frame.display_img, extent=[0, width, 0, height])
+    fig.canvas.flush_events()
+    plt.show()
+    plt.show(block=True)
+    print("Finished rendering - saving image")
+
+def render(threads, sky, samples, sample_type, mlt, max_bounce):
     # read sky
     print("Loading sky image")
     # required for processing HDR images properly
@@ -120,8 +180,8 @@ def render(threads, sky, samples, sample_type, max_bounce):
     
     # the HDRI loaded in macOS is [0, 255] not [0.0, 1.0], so
     # we normalize it for just macOS
-    # if platform == "darwin":
-       # sky_image = sky_image * 1.0 / 255.0
+    if platform == "darwin":
+        sky_image = sky_image * 1.0 / 255.0
     print("Image Loaded. Image Detail (Height, Width, Channel): ", sky_image.shape)
 
     print("Begin rendering")
@@ -137,7 +197,10 @@ def render(threads, sky, samples, sample_type, max_bounce):
     # initialize image
     frame = Frame(width, height)
     # path trace
-    threaded_path_trace(frame, sky, width, height, scene, samples, threads)
+    if(mlt):
+        threaded_mlt(frame, sky, width, height, scene, samples, threads)
+    else:
+        threaded_path_trace(frame, sky, width, height, scene, samples, threads)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
@@ -175,5 +238,9 @@ if __name__ == '__main__':
         required=True,
         help="Environment map file name, i.e. snow_field_2_puresky_1k"
     )
+    parser.add_argument(
+        '--mlt',
+        action='store_true'
+    )
     args = parser.parse_args()
-    render(args.thread_count, args.sky, args.sample_count, args.sample_type, args.max_bounce)
+    render(args.thread_count, args.sky, args.sample_count, args.sample_type, args.mlt, args.max_bounce)
