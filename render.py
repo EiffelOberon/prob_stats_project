@@ -22,17 +22,35 @@ from sampler import *
 from sphere import *
 from trace import *
 
+def radiance(frame, sampler, scene, bootstrap):
+    if(bootstrap == False):
+        # prepare sampler for this iteration if MCMC
+        sampler.start_iteration()
+    # get next samples for camera rays
+    u = sampler.next()
+    v = sampler.next()
+    # get camera ray
+    cam_ray = scene.camera.get_ray(u, v)
+    # compute screen coordinates
+    x = min(int(u * sampler.width), sampler.width - 1)
+    y = min(int(sampler.height - v * sampler.height), sampler.height - 1)
+    # record radiance for this pixel
+    r = RadianceRecord(x, y)
+    # start tracing rays
+    path = Path(x, y)
+    r.radiance = trace(scene, sampler, cam_ray, path)
+    return r
+
 def path_trace_row(frame, progress, start_y, step, width, height, scene, paths, sample_idx, samples):
+    seed = random.randint(0, 4294967296)
+    sampler = Sampler(width, height, seed)
     for y in range(start_y, height, step):
         if(y >= height):
             return
         for x in range(width):
             color = np.array([0.0, 0.0, 0.0])
             path_index = y * width + x
-            paths[path_index] = Path(x, y, path_index)
-            paths[path_index].bounce = 0
-            seed = (y << 16) + x
-            sampler = Sampler(width, height, seed)
+            paths[path_index] = Path(x, y)
             # calculate screen [0,1] coordinate
             u = float(x + sampler.next())/float(width)
             v = float((height - y) + sampler.next())/float(height)
@@ -108,6 +126,38 @@ def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
     plt.show(block=True)
     print("Finished rendering - saving image")
 
+def run_mcmc(frame, sampler, scene, b):
+    radiance_record = radiance(frame, sampler, scene, False)
+    proposed_luminance = luminance(radiance_record.radiance)
+    current_luminance = luminance(sampler.current_record.radiance)
+    # compute acceptance ratio based on luminance
+    ratio = 0.0
+    if(current_luminance > 0.0):
+        ratio = proposed_luminance / current_luminance
+    acceptance_ratio = max(0.0, min(1.0, ratio))
+    additional_weight = 0.0
+    if(sampler.large_step):
+        additional_weight = 1.0
+    weight1 = (acceptance_ratio + additional_weight) / (proposed_luminance / b + 0.25)
+    weight2 = (1.0 - acceptance_ratio) / (current_luminance / b + 0.25)
+    # two results
+    result1 = RadianceRecord(0, 0)
+    result1.x = radiance_record.x
+    result1.y = radiance_record.y
+    result1.radiance = radiance_record.radiance * weight1
+    result2 = RadianceRecord(0, 0)
+    result2.x = sampler.current_record.x
+    result2.y = sampler.current_record.y
+    result2.radiance = sampler.current_record.radiance * weight2
+    # determine if we accept
+    if(acceptance_ratio == 1.0 or sampler.uniform() < acceptance_ratio):
+        sampler.accept()
+        sampler.current_record = radiance_record
+    else:
+        sampler.reject()
+    return [result1, result2]
+
+
 def threaded_mlt(frame, sky, width, height, scene, samples, threads):
     step = threads
     threads = [None] * step
@@ -118,28 +168,64 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
     plt.ion()
     fig, ax = plt.subplots()
     sample_idx = 0
-    progress = [0] * height
-    # start threads
-    for i in range(step):
-        threads[i] = threading.Thread(target=path_trace_row, args=(frame, progress, i, step, width, height, scene, paths, sample_idx, samples))
-        threads[i].start()
-    # display image interactively
-    while(np.sum(progress) < height):
-        image_display = ax.imshow(frame.display_img, extent=[0, width, 0, height])
-        fig.canvas.flush_events()
-        plt.show()
-        time.sleep(0.5)
-    # wait for all threads to finish
-    for i in range(step):
-        threads[i].join()
-    # copy results
+    # set fixed seed for bootstrap
+    random.seed(1)
+    bootstrap_count = 100000
+    # prepare arrays
+    seeds = np.zeros(bootstrap_count)
+    weights = np.zeros(bootstrap_count)
+    cdf = np.zeros(bootstrap_count)
+    for i in range(bootstrap_count):
+        seeds[i] = random.randint(0, 4294967296)
+    weight_sum = 0.0
+    for i in range(bootstrap_count):
+        sampler = RandomNumberSampler(width, height, seeds[i])
+        r = radiance(frame, sampler, scene, True)
+        weights[i] = luminance(r.radiance)
+        weight_sum += weights[i]
+    cdf[0] = weights[0]
+    for i in range(1, bootstrap_count):
+        cdf[i] = cdf[i-1] + weights[i]
+    # last cdf over number of bootstrap
+    b = cdf[-1] / bootstrap_count
+    # start mcmc process now
+    count = 0
+    chains_count = 2048
+    mutations_count = int(np.ceil(float(width) * height * samples / chains_count))
+    print("chain count: %d, mutation count:%d" % (chains_count, mutations_count))
+    for i in range(0, chains_count):
+        # search for the seed that is the path we want to evaluate from the
+        # cdf list we have accumulated
+        r = random.random() * cdf[-1]
+        k = 1
+        while(k < bootstrap_count):
+            if(cdf[k-1] < r and r <= cdf[k]):
+                break
+            k += 1
+        k -= 1
+        # found seed, make sampler
+        sampler = MetropolisSampler(width, height, seeds[k])
+        sampler.current_record = radiance(frame, sampler, scene, False)
+        # reseed after first record for mutation
+        sampler.seed = random.randint(0, 4294967296)
+        for i in range(0, mutations_count):
+            results = run_mcmc(frame, sampler, scene, b)
+            # first result splat
+            y = results[0].y
+            x = results[0].x
+            frame.accumulation[y * width + x] = frame.accumulation[y * width + x] + results[0].radiance
+            # second result splat
+            y = results[1].y
+            x = results[1].x
+            frame.accumulation[y * width + x] = frame.accumulation[y * width + x] + results[1].radiance
+        count += 1
+        print("Done Markov Chain %d/%d acceptance rate: %f" % (count, chains_count, float(sampler.accepted) / float(sampler.accepted + sampler.rejected)))
+   
     for y in range(0, height):
-        rgb_row = ()
         for x in range(width):
-            color = frame.accumulation[y * width + x] / (sample_idx + 1)
-            color = linear_to_srgb(color)
-            rgb_row = rgb_row + (color[0], color[1], color[2])
-        frame.img[y] = rgb_row
+            color = linear_to_srgb(frame.accumulation[y * width + x] / (samples))
+            frame.display_img[y][x] = np.array([color[0], color[1], color[2]])
+
     # save image
     folder = "./results/" + sky + "_{}/"
     file = "./results/" + sky + "_{}/{}_{}_spp.png"

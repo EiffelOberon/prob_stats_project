@@ -42,6 +42,13 @@ class PrimarySample:
         # the iteration when we stored the backup value
         self.last_modified_iter = self.last_modified_backup
 
+
+class RadianceRecord:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.radiance = np.array([0.0, 0.0, 0.0])
+
 class MetropolisSampler(Sampler):
     def __init__(self, width, height, seed):
         super().__init__(width, height, seed)
@@ -52,6 +59,7 @@ class MetropolisSampler(Sampler):
         self.sample_index = 0
         self.accepted = 0
         self.rejected = 0
+        self.current_record = RadianceRecord(0, 0)
 
     def __str__(self):
         return f"{self.accepted}({self.rejected})"    
@@ -74,7 +82,7 @@ class MetropolisSampler(Sampler):
         if(self.X[idx].last_modified_iter < self.last_large_step_iter):
             self.X[idx].value = self.uniform()
             # update last modified iteration to the last large step iteration
-            self.X[idx].last_modified_iter = self.X[idx].last_large_step_iter
+            self.X[idx].last_modified_iter = self.last_large_step_iter
         if(self.large_step == True):
             self.X[idx].backup()
             self.X[idx].value = self.uniform()
@@ -83,11 +91,11 @@ class MetropolisSampler(Sampler):
             # mutate n-1 times first, then mutate the nth time and keep n-1th mutation
             # as the back up
             if(n_diff > 0):
-                val = self.Xi[idx].value
+                val = self.X[idx].value
                 while(n_diff > 0):
                     n_diff -= 1
-                    x = self.mutateRN(x, s1, s2)
-                self.X[idx].value = x
+                    val = self.mutateRN(val, s1, s2)
+                self.X[idx].value = val
                 self.X[idx].last_modified_iter = self.current_iter - 1
             self.X[idx].backup()
             self.X[idx].value = self.mutateRN(self.X[idx].value, s1, s2)
@@ -98,9 +106,8 @@ class MetropolisSampler(Sampler):
         if(self.sample_index >= self.X.size):
             self.X = np.append(self.X, np.array([PrimarySample()]))
         self.mutate(self.sample_index)
-        print("size: ", self.X.size)
-        print(self.X)
         self.sample_index += 1
+        return self.X[self.sample_index - 1].value
 
     def mutateRN(self, x, s1, s2):
         r = self.uniform()
@@ -119,13 +126,13 @@ class MetropolisSampler(Sampler):
     def accept(self):
         if(self.large_step):
             self.last_large_step_iter = self.current_iter
-        self.accept += 1
+        self.accepted += 1
         return
     
     def reject(self):
         for i in range(0,self.X.size):
-            if(self.x[i].last_modified_iter == self.current_iter):
-                self.x[i].restore()
-        self.reject += 1
+            if(self.X[i].last_modified_iter == self.current_iter):
+                self.X[i].restore()
+        self.rejected += 1
         self.current_iter -= 1
         return
