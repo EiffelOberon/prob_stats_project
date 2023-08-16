@@ -165,8 +165,10 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
     # record start time
     start = time.perf_counter()
     # figure for displaying image during render
+    '''
     plt.ion()
     fig, ax = plt.subplots()
+    '''
     sample_idx = 0
     # set fixed seed for bootstrap
     random.seed(1)
@@ -190,7 +192,7 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
     b = cdf[-1] / bootstrap_count
     # start mcmc process now
     count = 0
-    chains_count = 2048
+    chains_count = 4096
     mutations_count = int(np.ceil(float(width) * height * samples / chains_count))
     print("chain count: %d, mutation count:%d" % (chains_count, mutations_count))
     for i in range(0, chains_count):
@@ -222,19 +224,22 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
         print("Done Markov Chain %d/%d acceptance rate: %f" % (count, chains_count, float(sampler.accepted) / float(sampler.accepted + sampler.rejected)))
    
     for y in range(0, height):
+        rgb_row = ()
         for x in range(width):
             color = linear_to_srgb(frame.accumulation[y * width + x] / (samples))
-            frame.display_img[y][x] = np.array([color[0], color[1], color[2]])
+            #frame.display_img[y][x] = np.array([color[0], color[1], color[2]])
+            rgb_row = rgb_row + (color[0], color[1], color[2])
+        frame.img[y]=rgb_row
 
     # save image
     folder = "./results/" + sky + "_{}/"
     file = "./results/" + sky + "_{}/{}_{}_spp.png"
     if(scene.sampling == Sampling.IMPORTANCE_SAMPLING):
         folder = folder.format("mlt_is")
-        file = file.format("mlt_is", "is", (sample_idx + 1))
+        file = file.format("mlt_is", "is", (samples))
     else:
         folder = folder.format("mlt_sir")
-        file = file.format("mlt_sir", "sir", (sample_idx + 1))
+        file = file.format("mlt_sir", "sir", (samples))
 
     isExist = os.path.exists(folder)
     if isExist == False:
@@ -250,10 +255,12 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
     print("Render completed in: ", duration)
 
     # display finished image
+    '''
     image_display = ax.imshow(frame.display_img, extent=[0, width, 0, height])
     fig.canvas.flush_events()
     plt.show()
     plt.show(block=True)
+    '''
     print("Finished rendering - saving image")
 
 def render(threads, sky, samples, sample_type, mlt, max_bounce):
@@ -280,11 +287,14 @@ def render(threads, sky, samples, sample_type, mlt, max_bounce):
 
     # initialize scene
     scene = Scene(sample_algorithm, width, height, sky_image, max_bounce)
-    # initialize image
-    frame = Frame(width, height)
     # path trace
     if(mlt):
-        threaded_mlt(frame, sky, width, height, scene, samples, threads)
+        for i in range(1, samples + 1):
+            # initialize image
+            frame = Frame(width, height)
+            threaded_mlt(frame, sky, width, height, scene, i, threads)
     else:
+        # initialize image
+        frame = Frame(width, height)
         threaded_path_trace(frame, sky, width, height, scene, samples, threads)
     

@@ -15,7 +15,7 @@ def compare_images(reference, result):
     total = 0.0
     for x in range(0, width):
         for y in range(0, height):
-            diff = luminance(srgb_to_linear(reference[y][x])) - luminance(srgb_to_linear(result[y][x]))
+            diff = np.log(luminance(srgb_to_linear(reference[y][x]))+1) - np.log(luminance(srgb_to_linear(result[y][x]))+1)
             diff2 = diff * diff
             total = total + diff2
     return total / (width * height)
@@ -58,7 +58,7 @@ def image_comparison(lighting_file, image_count):
     ax.set_title(lighting_file)
     ax.legend(algorithm)
     ax.set_xlabel("Sample count")
-    ax.set_ylabel("MSE")
+    ax.set_ylabel("log(MSE)")
     plt.savefig("./results/" + lighting_file + "_" + str(image_count) + "_samples.png")
 
 if __name__ == '__main__':
