@@ -21,7 +21,7 @@ def compare_images(reference, result):
     return total / (width * height)
 
 def image_comparison(lighting_file, image_count):
-    algorithm = ["IS", "SIR"]
+    algorithm = ["IS", "MLT_IS"]
     reference_file = "./results/" + lighting_file + "_is/is_1000_spp.png" 
     reference_image = iio.imread(reference_file)
     print("Reference Image Loaded. Image Detail (Height, Width, Channel): ", reference_image.shape)
@@ -35,6 +35,8 @@ def image_comparison(lighting_file, image_count):
             compare_folder_path = compare_folder_path + "_is/"
         elif i == "SIR":
             compare_folder_path = compare_folder_path + "_sir/"
+        elif i == "MLT_IS":
+            compare_folder_path = compare_folder_path + "_mlt_is/"
         else:
             msg = "Incorrect algorithm type: " + i
             print(msg)
@@ -47,6 +49,8 @@ def image_comparison(lighting_file, image_count):
                 compare_image_path = compare_image_path + "is_" + str(image_idx+1) + "_spp.png"
             elif i == "SIR":
                 compare_image_path = compare_image_path + "sir_" + str(image_idx+1) + "_spp.png"
+            elif i == "MLT_IS":
+                compare_image_path = compare_image_path + "is_" + str(image_idx+1) + "_spp.png"
             result_image = iio.imread(compare_image_path)
             mse = compare_images(reference_image, result_image)
             mses[image_idx]=mse
@@ -59,7 +63,7 @@ def image_comparison(lighting_file, image_count):
     ax.legend(algorithm)
     ax.set_xlabel("Sample count")
     ax.set_ylabel("log(MSE)")
-    plt.savefig("./results/" + lighting_file + "_" + str(image_count) + "_samples.png")
+    plt.savefig("./results/" + lighting_file + "_" + str(image_count) + "_" + algorithm[0] + "_" + algorithm[1] + "_samples.png")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
