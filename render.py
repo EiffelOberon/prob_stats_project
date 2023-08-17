@@ -58,9 +58,9 @@ def path_trace_row(frame, progress, start_y, step, width, height, scene, paths, 
             # start tracing rays
             color = color + trace(scene, sampler, cam_ray, paths[path_index])
             frame.accumulation[y * width + x] = frame.accumulation[y * width + x] + color
-            color = linear_to_srgb(frame.accumulation[y * width + x] / (sample_idx + 1))
+            #color = linear_to_srgb(frame.accumulation[y * width + x] / (sample_idx + 1))
             # set image
-            frame.display_img[y][x] = np.array([color[0], color[1], color[2]])
+            #frame.display_img[y][x] = np.array([color[0], color[1], color[2]])
         progress[y] = 1
         print("Progress: %.2f%% [Sample: %i/%i]" % ((np.clip((np.sum(progress) / height), 0.0, 1.0) * 100), (sample_idx + 1), samples))
 
@@ -71,8 +71,10 @@ def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
     # record start time
     start = time.perf_counter()
     # figure for displaying image during render
+    '''
     plt.ion()
     fig, ax = plt.subplots()
+    '''
     for sample_idx in range(0, samples, 1):
         progress = [0] * height
         # start threads
@@ -80,11 +82,13 @@ def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
             threads[i] = threading.Thread(target=path_trace_row, args=(frame, progress, i, step, width, height, scene, paths, sample_idx, samples))
             threads[i].start()
         # display image interactively
+        '''
         while(np.sum(progress) < height):
             image_display = ax.imshow(frame.display_img, extent=[0, width, 0, height])
             fig.canvas.flush_events()
             plt.show()
             time.sleep(0.5)
+        '''
         # wait for all threads to finish
         for i in range(step):
             threads[i].join()
@@ -93,7 +97,7 @@ def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
             rgb_row = ()
             for x in range(width):
                 color = frame.accumulation[y * width + x] / (sample_idx + 1)
-                color = linear_to_srgb(color)
+                color = linear_to_srgb_no_gamma(color)
                 rgb_row = rgb_row + (color[0], color[1], color[2])
             frame.img[y] = rgb_row
         # save image
@@ -120,10 +124,12 @@ def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
     print("Render completed in: ", duration)
 
     # display finished image
+    '''
     image_display = ax.imshow(frame.display_img, extent=[0, width, 0, height])
     fig.canvas.flush_events()
     plt.show()
     plt.show(block=True)
+    '''
     print("Finished rendering - saving image")
 
 def run_mcmc(frame, sampler, scene, b):
@@ -226,7 +232,7 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
     for y in range(0, height):
         rgb_row = ()
         for x in range(width):
-            color = linear_to_srgb(frame.accumulation[y * width + x] / (samples))
+            color = linear_to_srgb_no_gamma(frame.accumulation[y * width + x] / (samples))
             #frame.display_img[y][x] = np.array([color[0], color[1], color[2]])
             rgb_row = rgb_row + (color[0], color[1], color[2])
         frame.img[y]=rgb_row
@@ -289,10 +295,12 @@ def render(threads, sky, samples, sample_type, mlt, max_bounce):
     scene = Scene(sample_algorithm, width, height, sky_image, max_bounce)
     # path trace
     if(mlt):
-        for i in range(1, samples + 1):
+        #for i in range(1, samples + 1):
             # initialize image
-            frame = Frame(width, height)
-            threaded_mlt(frame, sky, width, height, scene, i, threads)
+            #frame = Frame(width, height)
+            #threaded_mlt(frame, sky, width, height, scene, i, threads)
+        frame = Frame(width, height)
+        threaded_mlt(frame, sky, width, height, scene, samples, threads)
     else:
         # initialize image
         frame = Frame(width, height)
