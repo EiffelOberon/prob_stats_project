@@ -97,7 +97,7 @@ def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
             rgb_row = ()
             for x in range(width):
                 color = frame.accumulation[y * width + x] / (sample_idx + 1)
-                color = linear_to_srgb_no_gamma(color)
+                color = linear_to_srgb(color)
                 rgb_row = rgb_row + (color[0], color[1], color[2])
             frame.img[y] = rgb_row
         # save image
@@ -144,6 +144,7 @@ def run_mcmc(frame, sampler, scene, b):
     additional_weight = 0.0
     if(sampler.large_step):
         additional_weight = 1.0
+    # two weights for two results, PSSMLT does not discard the rejected samples completely
     weight1 = (acceptance_ratio + additional_weight) / (proposed_luminance / b + 0.25)
     weight2 = (1.0 - acceptance_ratio) / (current_luminance / b + 0.25)
     # two results
@@ -232,7 +233,7 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
     for y in range(0, height):
         rgb_row = ()
         for x in range(width):
-            color = linear_to_srgb_no_gamma(frame.accumulation[y * width + x] / (samples))
+            color = linear_to_srgb(frame.accumulation[y * width + x] / (samples))
             #frame.display_img[y][x] = np.array([color[0], color[1], color[2]])
             rgb_row = rgb_row + (color[0], color[1], color[2])
         frame.img[y]=rgb_row
@@ -295,12 +296,12 @@ def render(threads, sky, samples, sample_type, mlt, max_bounce):
     scene = Scene(sample_algorithm, width, height, sky_image, max_bounce)
     # path trace
     if(mlt):
-        #for i in range(1, samples + 1):
+        for i in range(1, samples + 1):
             # initialize image
-            #frame = Frame(width, height)
-            #threaded_mlt(frame, sky, width, height, scene, i, threads)
-        frame = Frame(width, height)
-        threaded_mlt(frame, sky, width, height, scene, samples, threads)
+            frame = Frame(width, height)
+            threaded_mlt(frame, sky, width, height, scene, i, threads)
+        #frame = Frame(width, height)
+        #threaded_mlt(frame, sky, width, height, scene, samples, threads)
     else:
         # initialize image
         frame = Frame(width, height)
