@@ -28,8 +28,8 @@ if __name__ == '__main__':
         '--max_bounce',
         type=int,
         nargs='?',
-        default=2,
-        help="Max number of bounce. (Default: 2)"
+        default=3,
+        help="Max number of bounce. (Default: 3)"
     )
     parser.add_argument(
         "--sky", 

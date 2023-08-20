@@ -21,7 +21,7 @@ def compare_images(reference, result):
     return total / (width * height)
 
 def image_comparison(lighting_file, image_count):
-    algorithm = ["IS", "MLT_IS"]
+    algorithm = ["MLT_IS", "MLT_SIR"]
     reference_file = "./results/" + lighting_file + "_is/is_1000_spp.png" 
     reference_image = iio.imread(reference_file)
     print("Reference Image Loaded. Image Detail (Height, Width, Channel): ", reference_image.shape)
@@ -37,6 +37,8 @@ def image_comparison(lighting_file, image_count):
             compare_folder_path = compare_folder_path + "_sir/"
         elif i == "MLT_IS":
             compare_folder_path = compare_folder_path + "_mlt_is/"
+        elif i == "MLT_SIR":
+            compare_folder_path = compare_folder_path + "_mlt_sir/"
         else:
             msg = "Incorrect algorithm type: " + i
             print(msg)
@@ -51,6 +53,8 @@ def image_comparison(lighting_file, image_count):
                 compare_image_path = compare_image_path + "sir_" + str(image_idx+1) + "_spp.png"
             elif i == "MLT_IS":
                 compare_image_path = compare_image_path + "is_" + str(image_idx+1) + "_spp.png"
+            elif i == "MLT_SIR":
+                compare_image_path = compare_image_path + "sir_" + str(image_idx+1) + "_spp.png"
             result_image = iio.imread(compare_image_path)
             mse = compare_images(reference_image, result_image)
             mses[image_idx]=mse
