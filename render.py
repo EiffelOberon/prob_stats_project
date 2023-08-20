@@ -58,9 +58,6 @@ def path_trace_row(frame, progress, start_y, step, width, height, scene, paths, 
             # start tracing rays
             color = color + trace(scene, sampler, cam_ray, paths[path_index])
             frame.accumulation[y * width + x] = frame.accumulation[y * width + x] + color
-            color = linear_to_srgb(frame.accumulation[y * width + x] / (sample_idx + 1))
-            # set image
-            frame.display_img[y][x] = np.array([color[0], color[1], color[2]])
         progress[y] = 1
         print("Progress: %.2f%% [Sample: %i/%i]" % ((np.clip((np.sum(progress) / height), 0.0, 1.0) * 100), (sample_idx + 1), samples))
 
@@ -70,61 +67,44 @@ def threaded_path_trace(frame, sky, width, height, scene, samples, threads):
     paths = [None] * width * height
     # record start time
     start = time.perf_counter()
-    # figure for displaying image during render
-    plt.ion()
-    fig, ax = plt.subplots()
     for sample_idx in range(0, samples, 1):
         progress = [0] * height
         # start threads
         for i in range(step):
             threads[i] = threading.Thread(target=path_trace_row, args=(frame, progress, i, step, width, height, scene, paths, sample_idx, samples))
             threads[i].start()
-        # display image interactively
-        while(np.sum(progress) < height):
-            image_display = ax.imshow(frame.display_img, extent=[0, width, 0, height])
-            fig.canvas.flush_events()
-            plt.show()
-            time.sleep(0.5)
         # wait for all threads to finish
         for i in range(step):
             threads[i].join()
-        # copy results
-        for y in range(0, height):
-            rgb_row = ()
-            for x in range(width):
-                color = frame.accumulation[y * width + x] / (sample_idx + 1)
-                color = linear_to_srgb(color)
-                rgb_row = rgb_row + (color[0], color[1], color[2])
-            frame.img[y] = rgb_row
-        # save image
-        folder = "./results/" + sky + "_{}/"
-        file = "./results/" + sky + "_{}/{}_{}_spp.png"
-        if(scene.sampling == Sampling.IMPORTANCE_SAMPLING):
-            folder = folder.format("is")
-            file = file.format("is", "is", (sample_idx + 1))
-        else:
-            folder = folder.format("sir")
-            file = file.format("sir", "sir", (sample_idx + 1))
+    # copy results
+    for y in range(0, height):
+        rgb_row = ()
+        for x in range(width):
+            color = frame.accumulation[y * width + x] / (samples)
+            color = linear_to_srgb(color)
+            rgb_row = rgb_row + (color[0], color[1], color[2])
+        frame.img[y] = rgb_row
+    # save image
+    folder = "./results/" + sky + "_{}/"
+    file = "./results/" + sky + "_{}/{}_{}_spp.png"
+    if(scene.sampling == Sampling.IMPORTANCE_SAMPLING):
+        folder = folder.format("is")
+        file = file.format("is", "is", (samples))
+    else:
+        folder = folder.format("sir")
+        file = file.format("sir", "sir", (samples))
 
-        isExist = os.path.exists(folder)
-        if isExist == False:
-            os.makedirs(folder)
-        with open(file, 'wb') as f:
-            w = png.Writer(width, height, greyscale=False, gamma=1.0)
-            w.write(f, frame.img)
-            print("Image saved")
-    
+    isExist = os.path.exists(folder)
+    if isExist == False:
+        os.makedirs(folder)
+    with open(file, 'wb') as f:
+        w = png.Writer(width, height, greyscale=False, gamma=1.0)
+        w.write(f, frame.img)
+        print("Image saved")
     # record end time
     end = time.perf_counter()
     duration = timedelta(seconds=end-start)
     print("Render completed in: ", duration)
-
-    # display finished image
-    image_display = ax.imshow(frame.display_img, extent=[0, width, 0, height])
-    fig.canvas.flush_events()
-    plt.show()
-    plt.show(block=True)
-    print("Finished rendering - saving image")
 
 def run_mcmc(frame, sampler, scene, b):
     radiance_record = radiance(frame, sampler, scene, False)
@@ -138,6 +118,7 @@ def run_mcmc(frame, sampler, scene, b):
     additional_weight = 0.0
     if(sampler.large_step):
         additional_weight = 1.0
+    # two weights for two results, PSSMLT does not discard the rejected samples completely
     weight1 = (acceptance_ratio + additional_weight) / (proposed_luminance / b + 0.25)
     weight2 = (1.0 - acceptance_ratio) / (current_luminance / b + 0.25)
     # two results
@@ -164,12 +145,6 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
     paths = [None] * width * height
     # record start time
     start = time.perf_counter()
-    # figure for displaying image during render
-    '''
-    plt.ion()
-    fig, ax = plt.subplots()
-    '''
-    sample_idx = 0
     # set fixed seed for bootstrap
     random.seed(1)
     bootstrap_count = 100000
@@ -227,7 +202,6 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
         rgb_row = ()
         for x in range(width):
             color = linear_to_srgb(frame.accumulation[y * width + x] / (samples))
-            #frame.display_img[y][x] = np.array([color[0], color[1], color[2]])
             rgb_row = rgb_row + (color[0], color[1], color[2])
         frame.img[y]=rgb_row
 
@@ -253,15 +227,6 @@ def threaded_mlt(frame, sky, width, height, scene, samples, threads):
     end = time.perf_counter()
     duration = timedelta(seconds=end-start)
     print("Render completed in: ", duration)
-
-    # display finished image
-    '''
-    image_display = ax.imshow(frame.display_img, extent=[0, width, 0, height])
-    fig.canvas.flush_events()
-    plt.show()
-    plt.show(block=True)
-    '''
-    print("Finished rendering - saving image")
 
 def render(threads, sky, samples, sample_type, mlt, max_bounce):
     # read sky
@@ -289,10 +254,9 @@ def render(threads, sky, samples, sample_type, mlt, max_bounce):
     scene = Scene(sample_algorithm, width, height, sky_image, max_bounce)
     # path trace
     if(mlt):
-        for i in range(1, samples + 1):
-            # initialize image
-            frame = Frame(width, height)
-            threaded_mlt(frame, sky, width, height, scene, i, threads)
+        # initialize image
+        frame = Frame(width, height)
+        threaded_mlt(frame, sky, width, height, scene, samples, threads)
     else:
         # initialize image
         frame = Frame(width, height)
