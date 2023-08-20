@@ -34,7 +34,7 @@ All the possible options are documented in:
 python ./output.py -h
 ```
 
-The list of images for environmment background for the option i.e., `--sky="belfast_sunset_puresky_1k"` available (credits to Polyhaven):
+The list of images for environmment background for the option i.e., `--sky="belfast_sunset_puresky_1k"` available (credits to [Polyhaven](https://polyhaven.com/)):
 ```
 belfast_sunset_puresky_1k
 drakensberg_solitary_mountain_puresky_1k

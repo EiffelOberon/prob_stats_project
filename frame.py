@@ -5,8 +5,6 @@ class Frame:
         # initialize image
         self.img = []
         self.accumulation = []
-        # display buffer
-        self.display_img = np.zeros((height, width, 3), dtype=np.uint8)
         for y in range(height):
             rgb_row = ()
             for x in range(width):
