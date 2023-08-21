@@ -21,7 +21,7 @@ def compare_images(reference, result):
     return total / (width * height)
 
 def image_comparison(lighting_file, image_count):
-    algorithm = ["MLT_IS", "MLT_SIR"]
+    algorithm = ["IS", "SIR"]
     reference_file = "./results/" + lighting_file + "_is/is_1000_spp.png" 
     reference_image = iio.imread(reference_file)
     print("Reference Image Loaded. Image Detail (Height, Width, Channel): ", reference_image.shape)
